@@ -1,25 +1,19 @@
-import logo from './logo.svg';
-import './App.css';
+// npm install tesseract.js pdfjs-dist 
+// npm start 
+
+
+import React from "react";
+import OCRExtractor from "./OCRExtractor";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{ padding: 20 }}>
+      <h2>App de OCR para comprobantes</h2>
+      <OCRExtractor />
     </div>
   );
 }
 
 export default App;
+
+
