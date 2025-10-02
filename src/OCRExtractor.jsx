@@ -1,6 +1,15 @@
+// src/OCRExtractor.js
 import React, { useState, useRef } from "react";
 import Tesseract from "tesseract.js";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf"; // usar legacy para browser
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import {
+  Box,
+  Typography,
+  Button,
+  LinearProgress,
+  Paper,
+} from "@mui/material";
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function OCRExtractor() {
@@ -44,8 +53,8 @@ export default function OCRExtractor() {
       imageBlob = file;
     }
 
-    // Ejecutar OCR con tesseract.js v4
-    setProgress(1);
+    // Ejecutar OCR
+    setProgress(5);
     Tesseract.recognize(imageBlob, "spa", {
       logger: (m) => {
         if (m.status === "recognizing text" && m.progress) {
@@ -85,13 +94,13 @@ export default function OCRExtractor() {
     while ((m = anyLongDigits.exec(norm)) !== null)
       if (!cvuMatches.includes(m[1])) cvuMatches.push(m[1]);
 
-    // Numero de operación
+    // Número de operación
     const opRegex = /Número de operación[^\d]*(\d{6,20})/i;
     const opAlt = /Operaci[oó]n[^\d]*(\d{6,20})/i;
     const opMatch = norm.match(opRegex) || norm.match(opAlt);
     const ops = opMatch ? [opMatch[1]] : [];
 
-    // Nombres heurísticos
+    // Nombres
     const names = [];
     const lines = norm
       .split(/\n+/)
@@ -125,48 +134,52 @@ export default function OCRExtractor() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h3>OCR Extractor (cliente)</h3>
-      <input
-        type="file"
-        accept="image/*,application/pdf"
-        onChange={handleFile}
-      />
-      <div style={{ marginTop: 10 }}>
-        <div>Progreso OCR: {progress}%</div>
-        <canvas ref={canvasRef} style={{ display: "none" }} />
-      </div>
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        OCR Extractor
+      </Typography>
 
-      <div style={{ marginTop: 20 }}>
-        <h4>Texto detectado:</h4>
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            background: "#f6f6f6",
-            padding: 10,
-          }}
-        >
-          {text}
-        </pre>
+      <Button variant="contained" component="label">
+        Subir comprobante
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          hidden
+          onChange={handleFile}
+        />
+      </Button>
 
-        <h4>Resultados extraídos:</h4>
-        <div>
-          <strong>Nombres:</strong>{" "}
-          {results.nombre.join(" — ") || "No encontrado"}
-        </div>
-        <div>
-          <strong>CUIT/CUIL:</strong>{" "}
-          {results.cuit.join(", ") || "No encontrado"}
-        </div>
-        <div>
-          <strong>CVU/CBU:</strong>{" "}
-          {results.cvu_cbu.join(", ") || "No encontrado"}
-        </div>
-        <div>
-          <strong>Número de operación:</strong>{" "}
-          {results.numero_operacion.join(", ") || "No encontrado"}
-        </div>
-      </div>
-    </div>
+      {progress > 0 && progress < 100 && (
+        <Box sx={{ width: "100%", mt: 2 }}>
+          <LinearProgress variant="determinate" value={progress} />
+          <Typography variant="body2" align="center">
+            {progress}%
+          </Typography>
+        </Box>
+      )}
+
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      {text && (
+        <Paper sx={{ mt: 3, p: 2, background: "#f6f6f6" }}>
+          <Typography variant="h6">Texto detectado:</Typography>
+          <Typography
+            variant="body2"
+            component="pre"
+            sx={{ whiteSpace: "pre-wrap" }}
+          >
+            {text}
+          </Typography>
+        </Paper>
+      )}
+
+      <Paper sx={{ mt: 3, p: 2 }}>
+        <Typography variant="h6">Resultados extraídos:</Typography>
+        <Typography><strong>Nombres:</strong> {results.nombre.join(" — ") || "No encontrado"}</Typography>
+        <Typography><strong>CUIT/CUIL:</strong> {results.cuit.join(", ") || "No encontrado"}</Typography>
+        <Typography><strong>CVU/CBU:</strong> {results.cvu_cbu.join(", ") || "No encontrado"}</Typography>
+        <Typography><strong>Número de operación:</strong> {results.numero_operacion.join(", ") || "No encontrado"}</Typography>
+      </Paper>
+    </Box>
   );
 }

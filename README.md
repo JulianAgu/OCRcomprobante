@@ -8,6 +8,7 @@ Testing Libraries:
 
 web-vitals: Para medir métricas de rendimiento de la app en producción.
 
+material-UI: Componentes y CSS
 
 Cómo usar la app
 
@@ -20,5 +21,8 @@ Ejecutar la app:
 
 npm start
 
+Usuario y Contraseña: 
+Test
+1234
 
 Subir comprobantes (imágenes o PDFs) y obtener la información extraída mediante OCR.
