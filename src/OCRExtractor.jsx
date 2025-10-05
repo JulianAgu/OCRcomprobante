@@ -25,6 +25,327 @@ export default function OCRExtractor() {
     cuit: [],
     cvu_cbu: [],
     numero_operacion: [],
+    monto: "No encontrado",
+    fecha: "No encontrado",
+  });
+  const [progress, setProgress] = useState(0);
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [historial, setHistorial] = useState(
+    JSON.parse(localStorage.getItem("historial")) || []
+  );
+
+  const canvasRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setText("");
+    setResults({
+      nombre: [],
+      cuit: [],
+      cvu_cbu: [],
+      numero_operacion: [],
+      monto: "No encontrado",
+      fecha: "No encontrado",
+    });
+    setProgress(0);
+
+    const isPdf = file.type === "application/pdf";
+    let imageBlob;
+
+    if (isPdf) {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = canvasRef.current;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      imageBlob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+    } else {
+      imageBlob = file;
+    }
+
+    setProgress(5);
+    Tesseract.recognize(imageBlob, "spa", {
+      logger: (m) => {
+        if (m.status === "recognizing text" && m.progress) {
+          setProgress(Math.round(m.progress * 100));
+        }
+      },
+    })
+      .then(({ data: { text } }) => {
+        setText(text);
+        const campos = extractFields(text);
+        setResults(campos);
+        setProgress(100);
+
+        // Guardar en historial
+        const nuevoComprobante = {
+          fecha: new Date().toLocaleString(),
+          nombreArchivo: file.name,
+          resultados: campos,
+        };
+        const historialActualizado = [nuevoComprobante, ...historial];
+        setHistorial(historialActualizado);
+        localStorage.setItem(
+          "historial",
+          JSON.stringify(historialActualizado)
+        );
+      })
+      .catch((err) => {
+        console.error(err);
+        setProgress(0);
+      });
+  };
+
+  function extractFields(t) {
+    if (!t) t = "";
+
+    const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
+
+    // CUIT/CUIL
+    const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
+    const cuitMatches = [];
+    let m;
+    while ((m = cuitRegex.exec(norm)) !== null) {
+      cuitMatches.push(m[1].replace(/[\s-]/g, ""));
+    }
+
+    // CVU/CBU
+    const cvuRegex = /\b(?:CVU|CBU)[:\s]*([0-9]{16,24})\b/gi;
+    const anyLongDigits = /\b([0-9]{20,24})\b/g;
+    const cvuMatches = [];
+    while ((m = cvuRegex.exec(norm)) !== null) cvuMatches.push(m[1]);
+    while ((m = anyLongDigits.exec(norm)) !== null)
+      if (!cvuMatches.includes(m[1])) cvuMatches.push(m[1]);
+
+    // Número de operación
+    const opRegex = /Número de operación[^\d]*(\d{6,20})/i;
+    const opAlt = /Operaci[oó]n[^\d]*(\d{6,20})/i;
+    const opMatch = norm.match(opRegex) || norm.match(opAlt);
+    const ops = opMatch ? [opMatch[1]] : [];
+
+    // Nombres
+    const names = [];
+    const lines = norm
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    for (let i = 0; i < lines.length; i++) {
+      const L = lines[i];
+      if (/^(De|Para)\b/i.test(L) && i + 1 < lines.length) {
+        const cand = lines[i + 1];
+        if (!/\d/.test(cand) || cand.split(" ").length >= 2) names.push(cand);
+      }
+      if (
+        /[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(L) &&
+        /\s+[A-ZÁÉÍÓÚÑ]/.test(L) &&
+        !/Comprobante|Mercado|Pago|Número|Código/i.test(L)
+      ) {
+        names.push(L);
+      }
+    }
+
+    const uniq = (arr) =>
+      Array.from(new Set(arr.map((s) => s.trim()))).filter(Boolean);
+
+    // Fecha
+    let fechaMatch =
+      norm.match(
+        /(?:Sábado|Domingo|Lunes|Martes|Miércoles|Jueves|Viernes)[^:\n]*\d{1,2}\s+de\s+\w+\s+de\s+\d{4}(\s+a\s+\d{1,2}:\d{2}\s*hs)?/i
+      ) ||
+      norm.match(/\b\d{2}\/\d{2}\/\d{4}\s*[-:]?\s*\d{1,2}:\d{2}\s*h/i);
+    const fecha = fechaMatch ? fechaMatch[0].trim() : "No encontrado";
+
+    // Monto
+    const montoMatch = norm.match(/\$\s?\d{1,3}(?:[\.\d]{0,})?(?:,\d{2})?/);
+    const monto = montoMatch ? montoMatch[0].trim() : "No encontrado";
+
+    return {
+      nombre: uniq(names),
+      cuit: uniq(cuitMatches),
+      cvu_cbu: uniq(cvuMatches),
+      numero_operacion: uniq(ops),
+      monto,
+      fecha,
+    };
+  }
+
+  return (
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        OCR Extractor
+      </Typography>
+
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+        <Button variant="contained" component="label">
+          Subir comprobante
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            hidden
+            onChange={handleFile}
+          />
+        </Button>
+
+        <Button variant="outlined" onClick={() => setHistorialOpen(true)}>
+          Ver historial
+        </Button>
+      </Box>
+
+      {progress > 0 && progress < 100 && (
+        <Box sx={{ width: "100%", mt: 2 }}>
+          <LinearProgress variant="determinate" value={progress} />
+          <Typography variant="body2" align="center">
+            {progress}%
+          </Typography>
+        </Box>
+      )}
+
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      {text && (
+        <Paper sx={{ mt: 3, p: 2, background: "#f6f6f6" }}>
+          <Typography variant="h6">Texto detectado:</Typography>
+          <Typography
+            variant="body2"
+            component="pre"
+            sx={{ whiteSpace: "pre-wrap" }}
+          >
+            {text}
+          </Typography>
+        </Paper>
+      )}
+
+      <Paper sx={{ mt: 3, p: 2 }}>
+        <Typography variant="h6">Resultados extraídos:</Typography>
+        <Typography>
+          <strong>Nombres:</strong> {results.nombre.join(" — ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>CUIT/CUIL:</strong> {results.cuit.join(", ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>CVU/CBU:</strong> {results.cvu_cbu.join(", ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>Número de operación:</strong>{" "}
+          {results.numero_operacion.join(", ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>Monto:</strong> {results.monto}
+        </Typography>
+        <Typography>
+          <strong>Fecha:</strong> {results.fecha}
+        </Typography>
+      </Paper>
+
+      {/* Modal de historial */}
+      <Dialog
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Historial de comprobantes
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            sx={{ float: "right" }}
+            onClick={() => {
+              setHistorial([]);
+              localStorage.removeItem("historial");
+            }}
+          >
+            Limpiar historial
+          </Button>
+        </DialogTitle>
+
+        <DialogContent>
+          <List>
+            {historial.length === 0 && (
+              <Typography variant="body2">
+                No hay comprobantes cargados
+              </Typography>
+            )}
+            {historial.map((item, idx) => (
+              <ListItem key={idx} divider>
+                <ListItemText
+                  primary={`${item.nombreArchivo} — ${item.fecha}`}
+                  secondary={
+                    <>
+                      <div>
+                        <strong>Nombres:</strong>{" "}
+                        {item.resultados.nombre.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CUIT/CUIL:</strong>{" "}
+                        {item.resultados.cuit.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CVU/CBU:</strong>{" "}
+                        {item.resultados.cvu_cbu.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Número de operación:</strong>{" "}
+                        {item.resultados.numero_operacion.join(", ") ||
+                          "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Monto:</strong> {item.resultados.monto}
+                      </div>
+                      <div>
+                        <strong>Fecha:</strong> {item.resultados.fecha}
+                      </div>
+                    </>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+      </Dialog>
+    </Box>
+  );
+}
+
+/*
+// src/OCRExtractor.jsx
+import React, { useState, useRef } from "react";
+import Tesseract from "tesseract.js";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import {
+  Box,
+  Typography,
+  Button,
+  LinearProgress,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  List,
+  ListItem,
+  ListItemText,
+} from "@mui/material";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+export default function OCRExtractor() {
+  const [text, setText] = useState("");
+  const [results, setResults] = useState({
+    nombre: [],
+    cuit: [],
+    cvu_cbu: [],
+    numero_operacion: [],
     monto: [],
     fecha: [],
   });
@@ -135,7 +456,7 @@ export default function OCRExtractor() {
     const montoMatches = norm.match(montoRegex) || [];
 
     // Fecha (dos formatos)
-    const fechaRegex1 = /(?:Lunes|Martes|Mi[eé]rcoles|Jueves|Viernes|S[aá]bado|Domingo).*/i;
+    const fechaRegex1 = /(?:Lunes|Martes|Mi[eé]rcoles|Jueves|Viernes|S[aá]bado|Domingo).i;
     const fechaRegex2 = /\b\d{2}\/\d{2}\/\d{4}\s*[:\-]\s*\d{2}:\d{2}\s*h\b/;
     const lines = norm.split("\n").map((l) => l.trim());
     const fechaMatches = lines.filter(
@@ -287,194 +608,6 @@ export default function OCRExtractor() {
       </Dialog>
     </Box>
   );
-}
+}*/
 
 
-
-
-/*// src/OCRExtractor.js
-import React, { useState, useRef } from "react";
-import Tesseract from "tesseract.js";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-import {
-  Box,
-  Typography,
-  Button,
-  LinearProgress,
-  Paper,
-} from "@mui/material";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-export default function OCRExtractor() {
-  const [text, setText] = useState("");
-  const [results, setResults] = useState({
-    nombre: [],
-    cuit: [],
-    cvu_cbu: [],
-    numero_operacion: [],
-  });
-  const [progress, setProgress] = useState(0);
-  const canvasRef = useRef(null);
-
-  const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setText("");
-    setResults({ nombre: [], cuit: [], cvu_cbu: [], numero_operacion: [] });
-    setProgress(0);
-
-    const isPdf = file.type === "application/pdf";
-    let imageBlob;
-
-    if (isPdf) {
-      // Renderizar PDF a canvas
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 2.0 });
-      const canvas = canvasRef.current;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d");
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // convertir a blob
-      imageBlob = await new Promise((res) => canvas.toBlob(res, "image/png"));
-    } else {
-      imageBlob = file;
-    }
-
-    // Ejecutar OCR
-    setProgress(5);
-    Tesseract.recognize(imageBlob, "spa", {
-      logger: (m) => {
-        if (m.status === "recognizing text" && m.progress) {
-          setProgress(Math.round(m.progress * 100));
-        }
-      },
-    })
-      .then(({ data: { text } }) => {
-        setText(text);
-        setResults(extractFields(text));
-        setProgress(100);
-      })
-      .catch((err) => {
-        console.error(err);
-        setProgress(0);
-      });
-  };
-
-  function extractFields(t) {
-    if (!t) t = "";
-
-    const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
-
-    // CUIT/CUIL
-    const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
-    const cuitMatches = [];
-    let m;
-    while ((m = cuitRegex.exec(norm)) !== null) {
-      cuitMatches.push(m[1].replace(/[\s-]/g, ""));
-    }
-
-    // CVU/CBU
-    const cvuRegex = /\b(?:CVU|CBU)[:\s]*([0-9]{16,24})\b/gi;
-    const anyLongDigits = /\b([0-9]{20,24})\b/g;
-    const cvuMatches = [];
-    while ((m = cvuRegex.exec(norm)) !== null) cvuMatches.push(m[1]);
-    while ((m = anyLongDigits.exec(norm)) !== null)
-      if (!cvuMatches.includes(m[1])) cvuMatches.push(m[1]);
-
-    // Número de operación
-    const opRegex = /Número de operación[^\d]*(\d{6,20})/i;
-    const opAlt = /Operaci[oó]n[^\d]*(\d{6,20})/i;
-    const opMatch = norm.match(opRegex) || norm.match(opAlt);
-    const ops = opMatch ? [opMatch[1]] : [];
-
-    // Nombres
-    const names = [];
-    const lines = norm
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    for (let i = 0; i < lines.length; i++) {
-      const L = lines[i];
-      if (/^(De|Para)\b/i.test(L) && i + 1 < lines.length) {
-        const cand = lines[i + 1];
-        if (!/\d/.test(cand) || cand.split(" ").length >= 2) names.push(cand);
-      }
-      if (
-        /[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(L) &&
-        /\s+[A-ZÁÉÍÓÚÑ]/.test(L) &&
-        !/Comprobante|Mercado|Pago|Número|Código/i.test(L)
-      ) {
-        names.push(L);
-      }
-    }
-
-    const uniq = (arr) =>
-      Array.from(new Set(arr.map((s) => s.trim()))).filter(Boolean);
-
-    return {
-      nombre: uniq(names),
-      cuit: uniq(cuitMatches),
-      cvu_cbu: uniq(cvuMatches),
-      numero_operacion: uniq(ops),
-    };
-  }
-
-  return (
-    <Box>
-      <Typography variant="h5" gutterBottom>
-        OCR Extractor
-      </Typography>
-
-      <Button variant="contained" component="label">
-        Subir comprobante
-        <input
-          type="file"
-          accept="image/*,application/pdf"
-          hidden
-          onChange={handleFile}
-        />
-      </Button>
-
-      {progress > 0 && progress < 100 && (
-        <Box sx={{ width: "100%", mt: 2 }}>
-          <LinearProgress variant="determinate" value={progress} />
-          <Typography variant="body2" align="center">
-            {progress}%
-          </Typography>
-        </Box>
-      )}
-
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
-      {text && (
-        <Paper sx={{ mt: 3, p: 2, background: "#f6f6f6" }}>
-          <Typography variant="h6">Texto detectado:</Typography>
-          <Typography
-            variant="body2"
-            component="pre"
-            sx={{ whiteSpace: "pre-wrap" }}
-          >
-            {text}
-          </Typography>
-        </Paper>
-      )}
-
-      <Paper sx={{ mt: 3, p: 2 }}>
-        <Typography variant="h6">Resultados extraídos:</Typography>
-        <Typography><strong>Nombres:</strong> {results.nombre.join(" — ") || "No encontrado"}</Typography>
-        <Typography><strong>CUIT/CUIL:</strong> {results.cuit.join(", ") || "No encontrado"}</Typography>
-        <Typography><strong>CVU/CBU:</strong> {results.cvu_cbu.join(", ") || "No encontrado"}</Typography>
-        <Typography><strong>Número de operación:</strong> {results.numero_operacion.join(", ") || "No encontrado"}</Typography>
-      </Paper>
-    </Box>
-  );
-}
-*/
