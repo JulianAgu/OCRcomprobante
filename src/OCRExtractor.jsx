@@ -25,6 +25,8 @@ export default function OCRExtractor() {
     cuit: [],
     cvu_cbu: [],
     numero_operacion: [],
+    monto: [],
+    fecha: [],
   });
   const [progress, setProgress] = useState(0);
   const [historialOpen, setHistorialOpen] = useState(false);
@@ -39,7 +41,14 @@ export default function OCRExtractor() {
     if (!file) return;
 
     setText("");
-    setResults({ nombre: [], cuit: [], cvu_cbu: [], numero_operacion: [] });
+    setResults({
+      nombre: [],
+      cuit: [],
+      cvu_cbu: [],
+      numero_operacion: [],
+      monto: [],
+      fecha: [],
+    });
     setProgress(0);
 
     const isPdf = file.type === "application/pdf";
@@ -78,7 +87,7 @@ export default function OCRExtractor() {
 
         // Guardar en historial
         const nuevoComprobante = {
-          fecha: new Date().toLocaleString(),
+          fechaGuardado: new Date().toLocaleString(),
           nombreArchivo: file.name,
           resultados: campos,
         };
@@ -97,9 +106,9 @@ export default function OCRExtractor() {
 
   function extractFields(t) {
     if (!t) t = "";
-
     const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
 
+    // CUIT/CUIL
     const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
     const cuitMatches = [];
     let m;
@@ -107,6 +116,7 @@ export default function OCRExtractor() {
       cuitMatches.push(m[1].replace(/[\s-]/g, ""));
     }
 
+    // CVU/CBU
     const cvuRegex = /\b(?:CVU|CBU)[:\s]*([0-9]{16,24})\b/gi;
     const anyLongDigits = /\b([0-9]{20,24})\b/g;
     const cvuMatches = [];
@@ -114,17 +124,26 @@ export default function OCRExtractor() {
     while ((m = anyLongDigits.exec(norm)) !== null)
       if (!cvuMatches.includes(m[1])) cvuMatches.push(m[1]);
 
+    // Número de operación
     const opRegex = /Número de operación[^\d]*(\d{6,20})/i;
     const opAlt = /Operaci[oó]n[^\d]*(\d{6,20})/i;
     const opMatch = norm.match(opRegex) || norm.match(opAlt);
     const ops = opMatch ? [opMatch[1]] : [];
 
-    const names = [];
-    const lines = norm
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
+    // Monto
+    const montoRegex = /\$\s?[\d.,]+/g;
+    const montoMatches = norm.match(montoRegex) || [];
 
+    // Fecha (dos formatos)
+    const fechaRegex1 = /(?:Lunes|Martes|Mi[eé]rcoles|Jueves|Viernes|S[aá]bado|Domingo).*/i;
+    const fechaRegex2 = /\b\d{2}\/\d{2}\/\d{4}\s*[:\-]\s*\d{2}:\d{2}\s*h\b/;
+    const lines = norm.split("\n").map((l) => l.trim());
+    const fechaMatches = lines.filter(
+      (line) => fechaRegex1.test(line) || fechaRegex2.test(line)
+    );
+
+    // Nombres
+    const names = [];
     for (let i = 0; i < lines.length; i++) {
       const L = lines[i];
       if (/^(De|Para)\b/i.test(L) && i + 1 < lines.length) {
@@ -134,7 +153,7 @@ export default function OCRExtractor() {
       if (
         /[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(L) &&
         /\s+[A-ZÁÉÍÓÚÑ]/.test(L) &&
-        !/Comprobante|Mercado|Pago|Número|Código/i.test(L)
+        !/Comprobante|Mercado|Pago|Número|Código|Transferencia|Concepto/i.test(L)
       ) {
         names.push(L);
       }
@@ -148,6 +167,8 @@ export default function OCRExtractor() {
       cuit: uniq(cuitMatches),
       cvu_cbu: uniq(cvuMatches),
       numero_operacion: uniq(ops),
+      monto: montoMatches,
+      fecha: fechaMatches,
     };
   }
 
@@ -209,12 +230,23 @@ export default function OCRExtractor() {
           <strong>CVU/CBU:</strong> {results.cvu_cbu.join(", ") || "No encontrado"}
         </Typography>
         <Typography>
-          <strong>Número de operación:</strong> {results.numero_operacion.join(", ") || "No encontrado"}
+          <strong>Número de operación:</strong>{" "}
+          {results.numero_operacion.join(", ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>Monto:</strong> {results.monto.join(", ") || "No encontrado"}
+        </Typography>
+        <Typography>
+          <strong>Fecha:</strong> {results.fecha.join(" | ") || "No encontrado"}
         </Typography>
       </Paper>
 
-      {/* Modal de historial */}
-      <Dialog open={historialOpen} onClose={() => setHistorialOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Historial de comprobantes</DialogTitle>
         <DialogContent>
           <List>
@@ -224,13 +256,27 @@ export default function OCRExtractor() {
             {historial.map((item, idx) => (
               <ListItem key={idx} divider>
                 <ListItemText
-                  primary={`${item.nombreArchivo} — ${item.fecha}`}
+                  primary={`${item.nombreArchivo} — ${item.fechaGuardado}`}
                   secondary={
                     <>
-                      <div><strong>Nombres:</strong> {item.resultados.nombre.join(", ") || "No encontrado"}</div>
-                      <div><strong>CUIT/CUIL:</strong> {item.resultados.cuit.join(", ") || "No encontrado"}</div>
-                      <div><strong>CVU/CBU:</strong> {item.resultados.cvu_cbu.join(", ") || "No encontrado"}</div>
-                      <div><strong>Número de operación:</strong> {item.resultados.numero_operacion.join(", ") || "No encontrado"}</div>
+                      <div>
+                        <strong>Nombres:</strong> {item.resultados.nombre.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CUIT/CUIL:</strong> {item.resultados.cuit.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CVU/CBU:</strong> {item.resultados.cvu_cbu.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Número de operación:</strong> {item.resultados.numero_operacion.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Monto:</strong> {item.resultados.monto.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Fecha:</strong> {item.resultados.fecha.join(" | ") || "No encontrado"}
+                      </div>
                     </>
                   }
                 />
@@ -242,6 +288,10 @@ export default function OCRExtractor() {
     </Box>
   );
 }
+
+
+
+
 /*// src/OCRExtractor.js
 import React, { useState, useRef } from "react";
 import Tesseract from "tesseract.js";
