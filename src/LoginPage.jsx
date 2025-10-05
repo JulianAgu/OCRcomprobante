@@ -8,7 +8,7 @@ export default function LoginPage({ onLogin }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (user === "test" && pass === "1234") {
+    if (user.toLowerCase() === "julieta" && pass === "1234") {
       onLogin();
     } else {
       alert("Usuario o contraseña incorrectos");
