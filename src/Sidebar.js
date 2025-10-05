@@ -40,7 +40,7 @@ export default function Sidebar({ onLogout }) {
           fullWidth
           onClick={onLogout}
         >
-          Logout
+          Desconectarse
         </Button>
       </div>
     </Drawer>

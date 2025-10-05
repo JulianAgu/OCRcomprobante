@@ -306,8 +306,8 @@ export default function OCRExtractor() {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        OCR Extractor
+      <Typography variant="h4" gutterBottom>
+        Carga de comprobantes bancarios
       </Typography>
 
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
