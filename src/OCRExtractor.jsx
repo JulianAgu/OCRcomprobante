@@ -336,21 +336,41 @@ export default function OCRExtractor() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           Historial de comprobantes
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            sx={{ float: "right" }}
-            onClick={() => {
-              setHistorial([]);
-              localStorage.removeItem("historial");
-            }}
-          >
-            Limpiar historial
-          </Button>
+
+          <Box sx={{ display: "flex", gap: 1 }}>
+            {historial.length > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={() => {
+                  setHistorial([]);
+                  localStorage.removeItem("historial");
+                }}
+              >
+                Limpiar historial
+              </Button>
+            )}
+
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              onClick={() => setHistorialOpen(false)}
+            >
+              Salir
+            </Button>
+          </Box>
         </DialogTitle>
+
         <DialogContent>
           <List>
             {historial.length === 0 && (
@@ -358,6 +378,7 @@ export default function OCRExtractor() {
                 No hay comprobantes cargados
               </Typography>
             )}
+
             {historial.map((item, idx) => (
               <ListItem key={idx} divider>
                 <ListItemText
@@ -385,8 +406,8 @@ export default function OCRExtractor() {
                         <strong>Monto:</strong>{" "}
                         {item.resultados.monto
                           ? item.resultados.monto
-                              .map((m) => `$${m}`)
-                              .join(", ") || "No encontrado"
+                            .map((m) => `$${m}`)
+                            .join(", ") || "No encontrado"
                           : "No encontrado"}
                       </div>
                       <div>
@@ -403,6 +424,7 @@ export default function OCRExtractor() {
           </List>
         </DialogContent>
       </Dialog>
+
     </Box>
   );
 }
