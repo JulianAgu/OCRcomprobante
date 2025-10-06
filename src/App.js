@@ -11,6 +11,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LoginPage from "./LoginPage";
 import OCRExtractor from "./OCRExtractor";
 import Sidebar from "./Sidebar";
+import Home from "./Home";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,6 +27,7 @@ export default function App() {
         <main style={{ flexGrow: 1, padding: "20px" }}>
           <Routes>
             <Route path="/" element={<Navigate to="/ocr" />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/ocr" element={<OCRExtractor />} />
             <Route path="/perfil" element={<h1>Perfil del usuario</h1>} />
           </Routes>

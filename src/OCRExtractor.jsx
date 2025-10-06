@@ -1,4 +1,5 @@
 // src/OCRExtractor.jsx
+// src/OCRExtractor.jsx
 import React, { useState, useRef } from "react";
 import Tesseract from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
@@ -33,6 +34,7 @@ export default function OCRExtractor() {
   const [historial, setHistorial] = useState(
     JSON.parse(localStorage.getItem("historial")) || []
   );
+  const [comprobanteCargado, setComprobanteCargado] = useState(false);
 
   const canvasRef = useRef(null);
 
@@ -41,8 +43,16 @@ export default function OCRExtractor() {
     if (!file) return;
 
     setText("");
-    setResults({ nombre: [], cuit: [], cvu_cbu: [], numero_operacion: [], monto: [], fecha: [] });
+    setResults({
+      nombre: [],
+      cuit: [],
+      cvu_cbu: [],
+      numero_operacion: [],
+      monto: [],
+      fecha: [],
+    });
     setProgress(0);
+    setComprobanteCargado(false);
 
     const isPdf = file.type === "application/pdf";
     let imageBlob;
@@ -77,6 +87,7 @@ export default function OCRExtractor() {
         const campos = extractFields(text);
         setResults(campos);
         setProgress(100);
+        setComprobanteCargado(true);
 
         // Guardar en historial
         const nuevoComprobante = {
@@ -99,7 +110,6 @@ export default function OCRExtractor() {
 
   function extractFields(t) {
     if (!t) t = "";
-
     const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
 
     // CUIT/CUIL
@@ -124,172 +134,101 @@ export default function OCRExtractor() {
     const opMatch = norm.match(opRegex) || norm.match(opAlt);
     const ops = opMatch ? [opMatch[1]] : [];
 
-    // Extracción del monto - Estrategia línea por línea
+    // Monto
     const montoMatches = [];
-    const lines = norm.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    
+    const lines = norm
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
     for (const line of lines) {
-      // Ignorar líneas que contengan palabras problemáticas
-      if (/motivo|varios|concepto|detalle|descripci[oó]n|nota/i.test(line)) {
+      if (/motivo|varios|concepto|detalle|descripci[oó]n|nota/i.test(line))
         continue;
-      }
-      
-      // Buscar patrones de monto en líneas limpias
       const montoPatterns = [
-        // $ seguido de números
         /\$\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/g,
-        // Palabras clave seguidas de números
         /(?:Total|Monto|Importe|Valor)[\s:]*\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/gi,
-        // Números seguidos de ARS
-        /([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)\s*(?:ARS|PESOS)/gi
+        /([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)\s*(?:ARS|PESOS)/gi,
       ];
-      
       for (const pattern of montoPatterns) {
         let match;
         while ((match = pattern.exec(line)) !== null) {
           const monto = match[1].replace(/\s/g, "");
-          
-          // Verificar que es solo números, comas y puntos
-          if (!/^[0-9.,]+$/.test(monto)) {
-            continue;
-          }
-          
-          // Convertir a número y validar
-          let numericValue = parseFloat(monto.replace(/,/g, '.').replace(/\.(?=.*\.)/g, ''));
-          
-          if (!isNaN(numericValue) && numericValue >= 0.1 && numericValue <= 100000000) {
+          if (!/^[0-9.,]+$/.test(monto)) continue;
+          let numericValue = parseFloat(
+            monto.replace(/,/g, ".").replace(/\.(?=.*\.)/g, "")
+          );
+          if (!isNaN(numericValue) && numericValue >= 0.1 && numericValue <= 100000000)
             montoMatches.push(monto);
-          }
         }
       }
     }
 
-    // Extracción de fechas
+    // Fecha
     const fechaMatches = [];
-    
-    // Meses en español para detección
     const meses = {
-      'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-      'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-      'septiembre': '09', 'setiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+      enero: "01",
+      febrero: "02",
+      marzo: "03",
+      abril: "04",
+      mayo: "05",
+      junio: "06",
+      julio: "07",
+      agosto: "08",
+      septiembre: "09",
+      setiembre: "09",
+      octubre: "10",
+      noviembre: "11",
+      diciembre: "12",
     };
-    
-    // Patrones para detectar fechas en diferentes formatos
     const fechaPatterns = [
-      // Formato dd/mm/yyyy o dd-mm-yyyy
       /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g,
-      // Formato yyyy/mm/dd o yyyy-mm-dd
       /\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/g,
-      // Formato dd de mes de yyyy (con día de semana opcional)
-      /\b(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo),?\s+(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})\b/gi,
-      // Formato dd de mes de yyyy (sin día de semana)
       /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})\b/gi,
-      // Formato mes dd, yyyy
       /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(\d{1,2}),?\s+(\d{4})\b/gi,
-      // Formato dd mes yyyy (con día de semana opcional)
-      /\b(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo),?\s+(\d{1,2})\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(\d{4})\b/gi,
-      // Formato dd mes yyyy (sin día de semana)
-      /\b(\d{1,2})\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(\d{4})\b/gi,
-      // Formato Fecha: dd/mm/yyyy
-      /(?:Fecha|Date)[:\s]+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/gi
+      /(?:Fecha|Date)[:\s]+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/gi,
     ];
-
     for (const pattern of fechaPatterns) {
       let match;
       while ((match = pattern.exec(norm)) !== null) {
         let fechaFormateada = "";
-        
-        // Determinar qué tipo de patrón coincidió basándose en el contenido del match
-        if (pattern.source.includes('lunes|martes') && pattern.source.includes('de.*de')) {
-          // Formato: día de semana, dd de mes de yyyy
-          const dia = match[1].padStart(2, '0');
+        if (pattern.source.includes("de")) {
+          const dia = match[1].padStart(2, "0");
           const mes = meses[match[2].toLowerCase()];
           const año = match[3];
           fechaFormateada = `${dia}/${mes}/${año}`;
-        } else if (pattern.source.includes('de.*de')) {
-          // Formato: dd de mes de yyyy (sin día de semana)
-          const dia = match[1].padStart(2, '0');
-          const mes = meses[match[2].toLowerCase()];
-          const año = match[3];
-          fechaFormateada = `${dia}/${mes}/${año}`;
-        } else if (pattern.source.includes('lunes|martes') && !pattern.source.includes('de.*de')) {
-          // Formato: día de semana, dd mes yyyy
-          const dia = match[1].padStart(2, '0');
-          const mes = meses[match[2].toLowerCase()];
-          const año = match[3];
-          fechaFormateada = `${dia}/${mes}/${año}`;
-        } else if (pattern.source.includes('enero|febrero') && !pattern.source.includes('lunes|martes')) {
-          if (match[0].includes(',')) {
-            // Formato: mes dd, yyyy
-            const mes = meses[match[1].toLowerCase()];
-            const dia = match[2].padStart(2, '0');
-            const año = match[3];
-            fechaFormateada = `${dia}/${mes}/${año}`;
-          } else {
-            // Formato: dd mes yyyy (sin día de semana)
-            const dia = match[1].padStart(2, '0');
-            const mes = meses[match[2].toLowerCase()];
-            const año = match[3];
-            fechaFormateada = `${dia}/${mes}/${año}`;
-          }
-        } else if (match[1] && match[1].length === 4) {
-          // Formato: yyyy/mm/dd
+        } else if (match[1].length === 4) {
           const año = match[1];
-          const mes = match[2].padStart(2, '0');
-          const dia = match[3].padStart(2, '0');
+          const mes = match[2].padStart(2, "0");
+          const dia = match[3].padStart(2, "0");
           fechaFormateada = `${dia}/${mes}/${año}`;
         } else {
-          // Formato: dd/mm/yyyy
-          const dia = match[1].padStart(2, '0');
-          const mes = match[2].padStart(2, '0');
+          const dia = match[1].padStart(2, "0");
+          const mes = match[2].padStart(2, "0");
           const año = match[3];
           fechaFormateada = `${dia}/${mes}/${año}`;
         }
-        
-        // Validar que la fecha sea razonable (entre 2000 y 2030)
-        const año = parseInt(fechaFormateada.split('/')[2]);
-        const mes = parseInt(fechaFormateada.split('/')[1]);
-        const dia = parseInt(fechaFormateada.split('/')[0]);
-        
-        if (año >= 2000 && año <= 2030 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) {
-          fechaMatches.push(fechaFormateada);
-        }
+        fechaMatches.push(fechaFormateada);
       }
     }
 
-    // Nombres de personas - Detección en línea siguiente
+    // Nombres (De/Para)
     const names = [];
-    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
-      // Debug: mostrar todas las líneas para ver qué está pasando
-      console.log(`Línea ${i}: "${line}"`);
-      
-      // Buscar patrones de "De" y "Para" en diferentes formatos:
-      // 1. Banco Galicia: "De:" o "Para:"
-      // 2. MercadoPago: "• De" o "• Para"
-      // 3. Otros formatos posibles
       const deParaPattern = /(?:^|\s|•\s*)(De|Para)\s*:?\s*$/i;
-      
       if (deParaPattern.test(line) && i + 1 < lines.length) {
         const nextLine = lines[i + 1].trim();
-        console.log(`Encontró "${line}", línea siguiente: "${nextLine}"`);
-        
-        // Verificar que la línea siguiente sea un nombre válido
-        // No debe ser CUIT, CVU, CBU, números de operación, etc.
-        if (nextLine && 
-            nextLine.length > 2 && 
-            !/^(CUIT|CVU|CBU|Mercado Pago|Banco)/i.test(nextLine) &&
-            !/^\d+[:\-]/.test(nextLine) && // No números seguidos de : o -
-            !/^[\d\s\-]+$/.test(nextLine)) { // No solo números, espacios y guiones
-          console.log(`Agregando nombre: "${nextLine}"`);
+        if (
+          nextLine &&
+          nextLine.length > 2 &&
+          !/^(CUIT|CVU|CBU|Mercado Pago|Banco)/i.test(nextLine) &&
+          !/^\d+[:\-]/.test(nextLine) &&
+          !/^[\d\s\-]+$/.test(nextLine)
+        ) {
           names.push(nextLine);
         }
       }
     }
-    
-    console.log("Nombres encontrados:", names);
 
     const uniq = (arr) =>
       Array.from(new Set(arr.map((s) => s.trim()))).filter(Boolean);
@@ -350,30 +289,53 @@ export default function OCRExtractor() {
         </Paper>
       )}
 
+      {/* Resultados */}
       <Paper sx={{ mt: 3, p: 2 }}>
         <Typography variant="h6">Resultados extraídos:</Typography>
-        <Typography>
-          <strong>Nombres:</strong> {results.nombre.join(" — ") || "No encontrado"}
-        </Typography>
-        <Typography>
-          <strong>CUIT/CUIL:</strong> {results.cuit.join(", ") || "No encontrado"}
-        </Typography>
-        <Typography>
-          <strong>CVU/CBU:</strong> {results.cvu_cbu.join(", ") || "No encontrado"}
-        </Typography>
-        <Typography>
-          <strong>Número de operación:</strong> {results.numero_operacion.join(", ") || "No encontrado"}
-        </Typography>
-        <Typography>
-          <strong>Monto:</strong> {results.monto.length > 0 ? results.monto.map(m => `$${m}`).join(", ") : "No encontrado"}
-        </Typography>
-        <Typography>
-          <strong>Fecha:</strong> {results.fecha.join(", ") || "No encontrado"}
-        </Typography>
+
+        {!comprobanteCargado ? (
+          <Typography color="text.secondary">
+            Aún no se cargó un comprobante
+          </Typography>
+        ) : (
+          <>
+            <Typography>
+              <strong>Nombres:</strong>{" "}
+              {results.nombre.join(" — ") || "No encontrado"}
+            </Typography>
+            <Typography>
+              <strong>CUIT/CUIL:</strong>{" "}
+              {results.cuit.join(", ") || "No encontrado"}
+            </Typography>
+            <Typography>
+              <strong>CVU/CBU:</strong>{" "}
+              {results.cvu_cbu.join(", ") || "No encontrado"}
+            </Typography>
+            <Typography>
+              <strong>Número de operación:</strong>{" "}
+              {results.numero_operacion.join(", ") || "No encontrado"}
+            </Typography>
+            <Typography>
+              <strong>Monto:</strong>{" "}
+              {results.monto.length > 0
+                ? results.monto.map((m) => `$${m}`).join(", ")
+                : "No encontrado"}
+            </Typography>
+            <Typography>
+              <strong>Fecha:</strong>{" "}
+              {results.fecha.join(", ") || "No encontrado"}
+            </Typography>
+          </>
+        )}
       </Paper>
 
       {/* Modal de historial */}
-      <Dialog open={historialOpen} onClose={() => setHistorialOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={historialOpen}
+        onClose={() => setHistorialOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>
           Historial de comprobantes
           <Button
@@ -392,7 +354,9 @@ export default function OCRExtractor() {
         <DialogContent>
           <List>
             {historial.length === 0 && (
-              <Typography variant="body2">No hay comprobantes cargados</Typography>
+              <Typography variant="body2">
+                No hay comprobantes cargados
+              </Typography>
             )}
             {historial.map((item, idx) => (
               <ListItem key={idx} divider>
@@ -400,12 +364,37 @@ export default function OCRExtractor() {
                   primary={`${item.nombreArchivo} — ${item.fecha}`}
                   secondary={
                     <>
-                      <div><strong>Nombres:</strong> {item.resultados.nombre.join(", ") || "No encontrado"}</div>
-                      <div><strong>CUIT/CUIL:</strong> {item.resultados.cuit.join(", ") || "No encontrado"}</div>
-                      <div><strong>CVU/CBU:</strong> {item.resultados.cvu_cbu.join(", ") || "No encontrado"}</div>
-                      <div><strong>Número de operación:</strong> {item.resultados.numero_operacion.join(", ") || "No encontrado"}</div>
-                      <div><strong>Monto:</strong> {item.resultados.monto ? item.resultados.monto.map(m => `$${m}`).join(", ") || "No encontrado" : "No encontrado"}</div>
-                      <div><strong>Fecha:</strong> {item.resultados.fecha ? item.resultados.fecha.join(", ") || "No encontrado" : "No encontrado"}</div>
+                      <div>
+                        <strong>Nombres:</strong>{" "}
+                        {item.resultados.nombre.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CUIT/CUIL:</strong>{" "}
+                        {item.resultados.cuit.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>CVU/CBU:</strong>{" "}
+                        {item.resultados.cvu_cbu.join(", ") || "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Número de operación:</strong>{" "}
+                        {item.resultados.numero_operacion.join(", ") ||
+                          "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Monto:</strong>{" "}
+                        {item.resultados.monto
+                          ? item.resultados.monto
+                              .map((m) => `$${m}`)
+                              .join(", ") || "No encontrado"
+                          : "No encontrado"}
+                      </div>
+                      <div>
+                        <strong>Fecha:</strong>{" "}
+                        {item.resultados.fecha
+                          ? item.resultados.fecha.join(", ") || "No encontrado"
+                          : "No encontrado"}
+                      </div>
                     </>
                   }
                 />

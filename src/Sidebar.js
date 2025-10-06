@@ -16,14 +16,14 @@ export default function Sidebar({ onLogout }) {
       }}
     >
       <List>
-        <ListItem button component={Link} to="/">
+        <ListItem button component={Link} to="/home">
           <ListItemIcon><Home /></ListItemIcon>
           <ListItemText primary="Inicio" />
         </ListItem>
 
         <ListItem button component={Link} to="/ocr">
           <ListItemIcon><Description /></ListItemIcon>
-          <ListItemText primary="OCR" />
+          <ListItemText primary="Comprobante" />
         </ListItem>
 
         <ListItem button component={Link} to="/perfil">
@@ -40,7 +40,7 @@ export default function Sidebar({ onLogout }) {
           fullWidth
           onClick={onLogout}
         >
-          Desconectarse
+          Salir
         </Button>
       </div>
     </Drawer>
