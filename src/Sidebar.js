@@ -1,7 +1,20 @@
 // src/Sidebar.js
 import * as React from "react";
-import { Drawer, List, ListItem, ListItemText, ListItemIcon, Button } from "@mui/material";
-import { Home, Description, Person, Logout } from "@mui/icons-material";
+import {
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Button,
+} from "@mui/material";
+import {
+  Home,
+  Description,
+  Person,
+  Logout,
+  History, // 👈 Importamos el nuevo icono
+} from "@mui/icons-material";
 import { Link } from "react-router-dom";
 
 export default function Sidebar({ onLogout }) {
@@ -17,18 +30,32 @@ export default function Sidebar({ onLogout }) {
     >
       <List>
         <ListItem button component={Link} to="/home">
-          <ListItemIcon><Home /></ListItemIcon>
+          <ListItemIcon>
+            <Home />
+          </ListItemIcon>
           <ListItemText primary="Inicio" />
         </ListItem>
 
         <ListItem button component={Link} to="/ocr">
-          <ListItemIcon><Description /></ListItemIcon>
+          <ListItemIcon>
+            <Description />
+          </ListItemIcon>
           <ListItemText primary="Comprobante" />
         </ListItem>
 
         <ListItem button component={Link} to="/perfil">
-          <ListItemIcon><Person /></ListItemIcon>
+          <ListItemIcon>
+            <Person />
+          </ListItemIcon>
           <ListItemText primary="Perfil" />
+        </ListItem>
+
+        {/* 🔥 Nuevo item: Historial */}
+        <ListItem button component={Link} to="/historial">
+          <ListItemIcon>
+            <History />
+          </ListItemIcon>
+          <ListItemText primary="Historial" />
         </ListItem>
       </List>
 

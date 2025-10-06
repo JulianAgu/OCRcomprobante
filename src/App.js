@@ -5,34 +5,40 @@
 // run > npm start 
 // usuario: test      passwd: 1234
 
-
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./LoginPage";
 import OCRExtractor from "./OCRExtractor";
 import Sidebar from "./Sidebar";
 import Home from "./Home";
+import Historial from "./Historial";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={() => setIsAuthenticated(true)} />;
-  }
-
   return (
     <Router>
-      <div style={{ display: "flex" }}>
-        <Sidebar onLogout={() => setIsAuthenticated(false)} />
-        <main style={{ flexGrow: 1, padding: "20px" }}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/ocr" />} />
-            <Route path="/home" element={<Home />} />
-            <Route path="/ocr" element={<OCRExtractor />} />
-            <Route path="/perfil" element={<h1>Perfil del usuario</h1>} />
-          </Routes>
-        </main>
-      </div>
+      {isAuthenticated ? (
+        <div style={{ display: "flex" }}>
+          <Sidebar onLogout={() => setIsAuthenticated(false)} />
+          <main style={{ flexGrow: 1, padding: "20px" }}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/ocr" />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/ocr" element={<OCRExtractor />} />
+              <Route path="/perfil" element={<h1>Perfil del usuario</h1>} />
+              <Route path="/historial" element={<Historial />} />
+            </Routes>
+          </main>
+        </div>
+      ) : (
+        <Routes>
+          <Route
+            path="*"
+            element={<LoginPage onLogin={() => setIsAuthenticated(true)} />}
+          />
+        </Routes>
+      )}
     </Router>
   );
 }

@@ -1,5 +1,4 @@
 // src/OCRExtractor.jsx
-// src/OCRExtractor.jsx
 import React, { useState, useRef } from "react";
 import Tesseract from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
