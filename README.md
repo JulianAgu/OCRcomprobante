@@ -22,7 +22,7 @@ Ejecutar la app:
 npm start
 
 Usuario y Contraseña: 
-Test
+Julieta
 1234
 
 Subir comprobantes (imágenes o PDFs) y obtener la información extraída mediante OCR.
