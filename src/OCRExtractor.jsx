@@ -1,4 +1,5 @@
 // src/OCRExtractor.jsx
+// src/OCRExtractor.jsx
 import React, { useState, useRef } from "react";
 import Tesseract from "tesseract.js";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
@@ -27,6 +28,8 @@ export default function OCRExtractor() {
     cuit: [],
     cvu_cbu: [],
     numero_operacion: [],
+    monto: [],
+    fecha: [],
     monto: [],
     fecha: [],
   });
@@ -67,7 +70,16 @@ export default function OCRExtractor() {
       monto: [],
       fecha: [],
     });
+    setResults({
+      nombre: [],
+      cuit: [],
+      cvu_cbu: [],
+      numero_operacion: [],
+      monto: [],
+      fecha: [],
+    });
     setProgress(0);
+    setComprobanteCargado(false);
     setComprobanteCargado(false);
 
     const isPdf = file.type === "application/pdf";
@@ -154,11 +166,85 @@ export default function OCRExtractor() {
 
     // Monto
     const montoMatches = [];
+    // Monto
+    const montoMatches = [];
     const lines = norm
       .split(/\n+/)
       .map((l) => l.trim())
       .filter(Boolean);
 
+    for (const line of lines) {
+      if (/motivo|varios|concepto|detalle|descripci[oó]n|nota/i.test(line))
+        continue;
+      const montoPatterns = [
+        /\$\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/g,
+        /(?:Total|Monto|Importe|Valor)[\s:]*\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/gi,
+        /([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)\s*(?:ARS|PESOS)/gi,
+      ];
+      for (const pattern of montoPatterns) {
+        let match;
+        while ((match = pattern.exec(line)) !== null) {
+          const monto = match[1].replace(/\s/g, "");
+          if (!/^[0-9.,]+$/.test(monto)) continue;
+          let numericValue = parseFloat(
+            monto.replace(/,/g, ".").replace(/\.(?=.*\.)/g, "")
+          );
+          if (!isNaN(numericValue) && numericValue >= 0.1 && numericValue <= 100000000)
+            montoMatches.push(monto);
+        }
+      }
+    }
+
+    // Fecha
+    const fechaMatches = [];
+    const meses = {
+      enero: "01",
+      febrero: "02",
+      marzo: "03",
+      abril: "04",
+      mayo: "05",
+      junio: "06",
+      julio: "07",
+      agosto: "08",
+      septiembre: "09",
+      setiembre: "09",
+      octubre: "10",
+      noviembre: "11",
+      diciembre: "12",
+    };
+    const fechaPatterns = [
+      /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g,
+      /\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/g,
+      /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})\b/gi,
+      /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(\d{1,2}),?\s+(\d{4})\b/gi,
+      /(?:Fecha|Date)[:\s]+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/gi,
+    ];
+    for (const pattern of fechaPatterns) {
+      let match;
+      while ((match = pattern.exec(norm)) !== null) {
+        let fechaFormateada = "";
+        if (pattern.source.includes("de")) {
+          const dia = match[1].padStart(2, "0");
+          const mes = meses[match[2].toLowerCase()];
+          const año = match[3];
+          fechaFormateada = `${dia}/${mes}/${año}`;
+        } else if (match[1].length === 4) {
+          const año = match[1];
+          const mes = match[2].padStart(2, "0");
+          const dia = match[3].padStart(2, "0");
+          fechaFormateada = `${dia}/${mes}/${año}`;
+        } else {
+          const dia = match[1].padStart(2, "0");
+          const mes = match[2].padStart(2, "0");
+          const año = match[3];
+          fechaFormateada = `${dia}/${mes}/${año}`;
+        }
+        fechaMatches.push(fechaFormateada);
+      }
+    }
+
+    // Nombres (De/Para)
+    const names = [];
     for (const line of lines) {
       if (/motivo|varios|concepto|detalle|descripci[oó]n|nota/i.test(line))
         continue;
@@ -245,6 +331,19 @@ export default function OCRExtractor() {
         ) {
           names.push(nextLine);
         }
+      const line = lines[i].trim();
+      const deParaPattern = /(?:^|\s|•\s*)(De|Para)\s*:?\s*$/i;
+      if (deParaPattern.test(line) && i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        if (
+          nextLine &&
+          nextLine.length > 2 &&
+          !/^(CUIT|CVU|CBU|Mercado Pago|Banco)/i.test(nextLine) &&
+          !/^\d+[:\-]/.test(nextLine) &&
+          !/^[\d\s\-]+$/.test(nextLine)
+        ) {
+          names.push(nextLine);
+        }
       }
     }
 
@@ -258,11 +357,15 @@ export default function OCRExtractor() {
       numero_operacion: uniq(ops),
       monto: uniq(montoMatches),
       fecha: uniq(fechaMatches),
+      monto: uniq(montoMatches),
+      fecha: uniq(fechaMatches),
     };
   }
 
   return (
     <Box>
+      <Typography variant="h4" gutterBottom>
+        Carga de comprobantes bancarios
       <Typography variant="h4" gutterBottom>
         Carga de comprobantes bancarios
       </Typography>
@@ -322,6 +425,7 @@ export default function OCRExtractor() {
         </Paper>
       )}
 
+      {/* Resultados */}
       {/* Resultados */}
       <Paper sx={{ mt: 3, p: 2 }}>
         <Typography variant="h6">Resultados extraídos:</Typography>
