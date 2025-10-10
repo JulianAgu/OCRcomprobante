@@ -21,6 +21,19 @@ export default function Historial() {
     setHistorial(data);
   }, []);
 
+  // 🔴 Eliminar todo el historial
+  const handleLimpiarTodo = () => {
+    localStorage.removeItem("historial");
+    setHistorial([]);
+  };
+
+  // 🗑️ Eliminar comprobante individual
+  const handleEliminarItem = (index) => {
+    const nuevoHistorial = historial.filter((_, i) => i !== index);
+    setHistorial(nuevoHistorial);
+    localStorage.setItem("historial", JSON.stringify(nuevoHistorial));
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -29,7 +42,7 @@ export default function Historial() {
 
       {/* Botones superiores */}
       <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-        <Button variant="outlined" color="error">
+        <Button variant="outlined" color="error" onClick={handleLimpiarTodo}>
           Limpiar todos
         </Button>
         <Button variant="contained" color="primary">
@@ -67,12 +80,19 @@ export default function Historial() {
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <DescriptionIcon color="primary" />
-                      <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ fontWeight: "bold" }}
+                      >
                         {item.nombreArchivo}
                       </Typography>
                     </Box>
 
-                    <IconButton color="error" size="small">
+                    <IconButton
+                      color="error"
+                      size="small"
+                      onClick={() => handleEliminarItem(idx)}
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </Box>
@@ -85,24 +105,24 @@ export default function Historial() {
 
                   <Typography variant="body2">
                     <strong>Nombres:</strong>{" "}
-                    {item.resultados.nombre.join(", ") || "No encontrado"}
+                    {item.resultados?.nombre?.join(", ") || "No encontrado"}
                   </Typography>
                   <Typography variant="body2">
                     <strong>CUIT/CUIL:</strong>{" "}
-                    {item.resultados.cuit.join(", ") || "No encontrado"}
+                    {item.resultados?.cuit?.join(", ") || "No encontrado"}
                   </Typography>
                   <Typography variant="body2">
                     <strong>CVU/CBU:</strong>{" "}
-                    {item.resultados.cvu_cbu.join(", ") || "No encontrado"}
+                    {item.resultados?.cvu_cbu?.join(", ") || "No encontrado"}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Número de operación:</strong>{" "}
-                    {item.resultados.numero_operacion.join(", ") ||
+                    {item.resultados?.numero_operacion?.join(", ") ||
                       "No encontrado"}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Monto:</strong>{" "}
-                    {item.resultados.monto
+                    {item.resultados?.monto
                       ? item.resultados.monto
                           .map((m) => `$${m}`)
                           .join(", ") || "No encontrado"

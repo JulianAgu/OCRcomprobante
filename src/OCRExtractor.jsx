@@ -455,6 +455,11 @@ export default function OCRExtractor() {
               );
             })}
           </List>
+          {historial.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Aún no se cargaron comprobantes.
+            </Typography>
+          )}
         </DialogContent>
       </Dialog>
     </Box>
