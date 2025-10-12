@@ -21,6 +21,73 @@ export default function Historial() {
     setHistorial(data);
   }, []);
 
+  // Función para exportar a CSV
+  const exportarACSV = () => {
+    if (historial.length === 0) {
+      alert("No hay datos para exportar");
+      return;
+    }
+
+    // Función para limpiar y formatear datos
+    const limpiarDato = (dato) => {
+      if (!dato) return "No encontrado";
+      if (Array.isArray(dato)) {
+        return dato.length > 0 ? dato.join("; ") : "No encontrado";
+      }
+      // Remover saltos de línea y caracteres especiales
+      return dato.toString().replace(/[\r\n]/g, " ").replace(/\s+/g, " ").trim();
+    };
+
+    // Cabeceras del CSV
+    const headers = [
+      "Nombre Archivo",
+      "Fecha Procesamiento",
+      "Nombres",
+      "CUIT/CUIL",
+      "CVU/CBU",
+      "Número de Operación",
+      "Monto",
+      "Fecha Comprobante"
+    ];
+
+    // Convertir datos a filas CSV
+    const rows = historial.map(item => [
+      limpiarDato(item.nombreArchivo),
+      limpiarDato(item.fecha),
+      limpiarDato(item.resultados.nombre),
+      limpiarDato(item.resultados.cuit),
+      limpiarDato(item.resultados.cvu_cbu),
+      limpiarDato(item.resultados.numero_operacion),
+      limpiarDato(item.resultados.monto),
+      limpiarDato(item.resultados.fecha)
+    ]);
+
+    // Crear contenido CSV con mejor escape de caracteres
+    const csvContent = [headers, ...rows]
+      .map(row => 
+        row.map(field => {
+          // Escapar comillas dobles y envolver en comillas
+          const cleanField = field.toString().replace(/"/g, '""');
+          return `"${cleanField}"`;
+        }).join(",")
+      )
+      .join("\r\n");
+
+    // Crear y descargar archivo con encoding correcto
+    const blob = new Blob(["\uFEFF" + csvContent], { 
+      type: "text/csv;charset=utf-8;" 
+    });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `historial_comprobantes_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -32,7 +99,7 @@ export default function Historial() {
         <Button variant="outlined" color="error">
           Limpiar todos
         </Button>
-        <Button variant="contained" color="primary">
+        <Button variant="contained" color="primary" onClick={exportarACSV}>
           Extraer a Excel
         </Button>
       </Box>
