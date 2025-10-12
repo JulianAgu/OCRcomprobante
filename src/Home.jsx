@@ -3,7 +3,6 @@ import {
     Typography, 
     Card, 
     CardContent, 
-    Grid, 
     Paper,
     List,
     ListItem,
@@ -16,9 +15,7 @@ import {
     CalendarToday, 
     Person, 
     CreditCard,
-    Numbers,
-    History,
-    CloudUpload
+    History
 } from '@mui/icons-material';
 
 const Home = () => {
@@ -58,7 +55,16 @@ const Home = () => {
     return (
         <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
             {/* Bienvenida */}
-            <Paper elevation={3} sx={{ p: 4, mb: 4, textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+            <Paper 
+                elevation={3} 
+                sx={{ 
+                    p: 4, 
+                    mb: 4, 
+                    textAlign: 'center', 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                    color: 'white' 
+                }}
+            >
                 <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
                     ¡Bienvenida Julieta!
                 </Typography>
@@ -84,30 +90,44 @@ const Home = () => {
                 </CardContent>
             </Card>
 
-            {/* Funcionalidades */}
+            {/* Funcionalidades principales */}
             <Typography variant="h5" component="h2" gutterBottom color="primary" sx={{ fontWeight: 'bold', mb: 3 }}>
                 Funcionalidades Principales
             </Typography>
-            
-            <Grid container spacing={3}>
+
+            <Box 
+                sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(2, 1fr)', 
+                    gap: 3 
+                }}
+            >
                 {features.map((feature, index) => (
-                    <Grid item xs={12} sm={6} md={4} key={index}>
-                        <Card elevation={2} sx={{ height: '100%', '&:hover': { transform: 'translateY(-4px)', transition: 'transform 0.2s' } }}>
-                            <CardContent sx={{ textAlign: 'center', p: 3 }}>
-                                <Box sx={{ mb: 2 }}>
-                                    {feature.icon}
-                                </Box>
-                                <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                    {feature.title}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {feature.description}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
+                    <Card
+                        key={index}
+                        elevation={2}
+                        sx={{
+                            minHeight: 180, // altura uniforme
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            '&:hover': { transform: 'translateY(-4px)', transition: 'transform 0.2s' }
+                        }}
+                    >
+                        <CardContent sx={{ textAlign: 'center', p: 3 }}>
+                            <Box sx={{ mb: 2 }}>
+                                {feature.icon}
+                            </Box>
+                            <Typography variant="h6" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                {feature.title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                {feature.description}
+                            </Typography>
+                        </CardContent>
+                    </Card>
                 ))}
-            </Grid>
+            </Box>
 
             {/* Instrucciones de uso */}
             <Card elevation={2} sx={{ mt: 4 }}>
