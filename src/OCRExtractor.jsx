@@ -159,30 +159,25 @@ export default function OCRExtractor() {
       if (nombreMatch) campos.nombre.push(nombreMatch[1].trim());
      
       // 🔹 CVU/CBU (búsqueda robusta en líneas)
-     const lines = norm.split(/\n+/).map(l => l.trim()).filter(Boolean);
-     const cvuMatches = [];
+      const cvuMatches = [];
+      const regex = /(?:CVU|CBU)[\s:\-]*([\d\s\-]{16,24})/gi;
 
-      for (let i = 0; i < lines.length; i++) {
-        if (/^(CVU|CBU)$/i.test(lines[i])) {
-          // la siguiente línea suele contener el número
-          const next = lines[i + 1]?.replace(/\D/g, "");
-          if (next && next.length >= 16 && next.length <= 24) {
-            cvuMatches.push(next);
-          }
-        } else if (/^(CVU|CBU)\s*[:\-]?\s*([0-9\s\-]{16,24})$/i.test(lines[i])) {
-          // caso: etiqueta y número en la misma línea
-          const match = lines[i].match(/([0-9\s\-]{16,24})/);
-          if (match) cvuMatches.push(match[1].replace(/\D/g, ""));
+      // Busca “CBU” y captura números, incluso si hay saltos de línea
+      const textFlat = norm.replace(/\n+/g, " ");
+      let match;
+      while ((match = regex.exec(textFlat)) !== null) {
+        const cbu = match[1].replace(/\D/g, "");
+        if (cbu.length >= 16 && cbu.length <= 24 && !cvuMatches.includes(cbu)) {
+        cvuMatches.push(cbu);
         }
-      }
+    }
 
-      // fallback: si no encontró nada, busca dígitos largos en todo el texto
+      // fallback: cualquier secuencia larga de dígitos (por si el OCR no detectó la palabra CBU)
       if (cvuMatches.length === 0) {
-        const longDigits = norm.match(/\b\d{16,24}\b/g) || [];
-        cvuMatches.push(...longDigits);
+      const longDigits = [...textFlat.matchAll(/\b\d{16,24}\b/g)].map(m => m[0]);
+      cvuMatches.push(...longDigits);
       }
 
-      // guardamos en campos
       if (cvuMatches.length > 0) campos.cvu_cbu = cvuMatches;
       return campos;
     }
