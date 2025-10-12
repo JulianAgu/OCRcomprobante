@@ -13,7 +13,7 @@ import {
   Description,
   Person,
   Logout,
-  History, // 👈 Importamos el nuevo icono
+  History,
 } from "@mui/icons-material";
 import { Link } from "react-router-dom";
 
@@ -29,6 +29,7 @@ export default function Sidebar({ onLogout }) {
       }}
     >
       <List>
+        {/* Inicio */}
         <ListItem button component={Link} to="/home">
           <ListItemIcon>
             <Home />
@@ -36,6 +37,7 @@ export default function Sidebar({ onLogout }) {
           <ListItemText primary="Inicio" />
         </ListItem>
 
+        {/* Comprobante */}
         <ListItem button component={Link} to="/ocr">
           <ListItemIcon>
             <Description />
@@ -43,14 +45,21 @@ export default function Sidebar({ onLogout }) {
           <ListItemText primary="Comprobante" />
         </ListItem>
 
-        <ListItem button component={Link} to="/perfil">
+        {/* Perfil (en desarrollo) */}
+        <ListItem
+          disabled // 🚫 lo deshabilita visualmente y funcionalmente
+          sx={{
+            opacity: 0.5, // 🔘 grisado
+            cursor: "not-allowed", // 🔘 cursor bloqueado
+          }}
+        >
           <ListItemIcon>
-            <Person />
+            <Person color="disabled" /> {/* Ícono gris */}
           </ListItemIcon>
-          <ListItemText primary="Perfil" />
+          <ListItemText primary="Perfil (en desarrollo)" />
         </ListItem>
 
-        {/* 🔥 Nuevo item: Historial */}
+        {/* Historial */}
         <ListItem button component={Link} to="/historial">
           <ListItemIcon>
             <History />
@@ -59,6 +68,7 @@ export default function Sidebar({ onLogout }) {
         </ListItem>
       </List>
 
+      {/* Botón salir */}
       <div style={{ marginTop: "auto", padding: "10px" }}>
         <Button
           variant="outlined"
