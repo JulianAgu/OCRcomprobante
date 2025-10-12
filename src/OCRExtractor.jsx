@@ -157,7 +157,33 @@ export default function OCRExtractor() {
      // 🔹 Nombre del titular (Naranja X) — versión robusta y sin shadowing de `norm`
       const nombreMatch = norm.match(/NX\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)(?=\s+(?:Naranja|CBU|CUIL|\d|$))/i);
       if (nombreMatch) campos.nombre.push(nombreMatch[1].trim());
-    
+     
+      // 🔹 CVU/CBU (búsqueda robusta en líneas)
+     const lines = norm.split(/\n+/).map(l => l.trim()).filter(Boolean);
+     const cvuMatches = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        if (/^(CVU|CBU)$/i.test(lines[i])) {
+          // la siguiente línea suele contener el número
+          const next = lines[i + 1]?.replace(/\D/g, "");
+          if (next && next.length >= 16 && next.length <= 24) {
+            cvuMatches.push(next);
+          }
+        } else if (/^(CVU|CBU)\s*[:\-]?\s*([0-9\s\-]{16,24})$/i.test(lines[i])) {
+          // caso: etiqueta y número en la misma línea
+          const match = lines[i].match(/([0-9\s\-]{16,24})/);
+          if (match) cvuMatches.push(match[1].replace(/\D/g, ""));
+        }
+      }
+
+      // fallback: si no encontró nada, busca dígitos largos en todo el texto
+      if (cvuMatches.length === 0) {
+        const longDigits = norm.match(/\b\d{16,24}\b/g) || [];
+        cvuMatches.push(...longDigits);
+      }
+
+      // guardamos en campos
+      if (cvuMatches.length > 0) campos.cvu_cbu = cvuMatches;
       return campos;
     }
     //FINAL CASO NARANJAX
