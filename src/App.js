@@ -23,10 +23,10 @@ export default function App() {
           <Sidebar onLogout={() => setIsAuthenticated(false)} />
           <main style={{ flexGrow: 1, padding: "20px" }}>
             <Routes>
-              <Route path="/" element={<Navigate to="/ocr" />} />
+              <Route path="/" element={<Navigate to="/home" />} />
               <Route path="/home" element={<Home />} />
               <Route path="/ocr" element={<OCRExtractor />} />
-              <Route path="/perfil" element={<h1>Perfil del usuario</h1>} />
+              <Route path="/perfil" element={<h1>Perfil del usuario (En desarrollo)</h1>} />
               <Route path="/historial" element={<Historial />} />
             </Routes>
           </main>
