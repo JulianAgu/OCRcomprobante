@@ -404,9 +404,7 @@ export default function OCRExtractor() {
           onChange={handleFile}
         />
 
-        <Button variant="outlined" onClick={() => setHistorialOpen(true)}>
-          Ver historial
-        </Button>
+       
       </Box>
 
       {progress > 0 && progress < 100 && (
