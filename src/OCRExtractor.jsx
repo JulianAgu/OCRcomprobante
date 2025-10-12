@@ -135,10 +135,63 @@ export default function OCRExtractor() {
       // 🔹 Normalizamos texto
       const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
 
-      // 🔹 Monto (línea con símbolo $)
-      const montoMatch = norm.match(/\$\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,]\d{2})?)/);
-    
-      if (montoMatch) campos.monto.push(montoMatch[1].replace(/[.,]/g, (m) => (m === "," ? "." : "")));
+     // 🔹 Monto (robusto para NaranjaX: acepta OCR que lee "$" como "s" o sin símbolo)
+      let monto = null;
+
+      // clean general (usa 'norm' ya definido)
+      const cleanNormMonto = norm
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")   // zero-width
+        .replace(/\u00A0/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .replace(/([^\d])s\s+([0-9])/gi, "$1$ $2"); // intenta corregir "s 10" -> "$ 10"
+
+      // 1) Buscar ventana cerca de la palabra clave "Enviaste" (si existe), sino usar todo
+      let windowText = cleanNormMonto;
+      const keyPos = cleanNormMonto.search(/enviaste|enviaste:/i);
+      if (keyPos !== -1) {
+        windowText = cleanNormMonto.slice(keyPos, keyPos + 160); // toma 160 chars a partir de "Enviaste"
+      }
+
+      // 2) Si hay un símbolo $ (o S), preferir la coincidencia con símbolo
+      const prefMatch = windowText.match(/[\$\uFF04S]\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,]\d{1,2})?)/i);
+      if (prefMatch && prefMatch[1]) {
+        monto = prefMatch[1];
+      }
+
+      // 3) Si no, extraer todos los trozos numéricos en la ventana y procesarlos
+      if (!monto) {
+        // encuentra todos los grupos tipo "123", "3.000", "00", "10", "3,50", etc.
+        const allNums = Array.from(windowText.matchAll(/([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,]\d{1,2})?)/g)).map(m => m[1]);
+
+        if (allNums.length > 0) {
+          // si hay al menos uno, tomar el último candidato
+          let last = allNums[allNums.length - 1];
+
+          // si el último tiene 1 o 2 dígitos (probable centavos) y hay un anterior, combinarlos:
+          // ejemplo: ["00","10"] -> combina en "10.00"
+          if (/^[0-9]{1,2}$/.test(last) && allNums.length >= 2) {
+            const pen = allNums[allNums.length - 2];
+            // limpiar puntos de miles del pen
+            const penClean = pen.replace(/\./g, "").replace(",", ".");
+            last = `${penClean}.${last.padStart(2, "0")}`;
+          }
+
+          monto = last;
+        }
+      }
+
+      // 4) Normalizar monto y formatear con 2 decimales
+      if (monto) {
+        // quitar separadores de miles y unificar decimal con punto
+        let normalized = monto.replace(/\./g, "").replace(",", ".").trim();
+        // puede quedar algo como "3000" o "10.00"
+        const num = parseFloat(normalized);
+        if (!isNaN(num)) {
+          // formatear con 2 decimales (opcional: si querés sin decimales, cambia toFixed)
+          campos.monto.push(`${num.toFixed(2)}`);
+        }
+      }
+
 
       // 🔹 Fecha (formato dd/mmm/yyyy o dd/MMM/yyyy)
       const fechaMatch = norm.match(/\b(\d{2}\/[A-Z]{3,9}\/\d{4}|\d{2}\/\d{2}\/\d{4})/i);
