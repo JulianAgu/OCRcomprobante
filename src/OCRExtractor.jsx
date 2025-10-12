@@ -194,10 +194,87 @@ export default function OCRExtractor() {
 
 
       // 🔹 Fecha (formato dd/mmm/yyyy o dd/MMM/yyyy)
-      const fechaMatch = norm.match(/\b(\d{2}\/[A-Z]{3,9}\/\d{4}|\d{2}\/\d{2}\/\d{4})/i);
-      if (fechaMatch) campos.fecha.push(fechaMatch[1]);
+        
+      const fechaMatches = [];
 
-      // 🔹 Código o número de transacción
+      // Diccionario de meses (por si aparece el nombre en texto)
+      const meses = {
+        enero: "01",
+        febrero: "02",
+        marzo: "03",
+        abril: "04",
+        mayo: "05",
+        junio: "06",
+        julio: "07",
+        agosto: "08",
+        septiembre: "09",
+        setiembre: "09",
+        octubre: "10",
+        noviembre: "11",
+        diciembre: "12",
+        // Abreviaturas en mayúsculas o con OCR mal interpretadas
+        JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+        JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
+        "0CT": "10" // caso especial NaranjaX con cero
+      };
+
+      // Patrones de fecha comunes + casos con abreviaturas o errores OCR
+      const fechaPatterns = [
+        /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g, // 04/10/2025 o 4-10-2025
+        /\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/g, // 2025/10/04
+        /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})\b/gi, // 4 de octubre de 2025
+        /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(\d{1,2}),?\s+(\d{4})\b/gi, // octubre 4, 2025
+        /\b(\d{1,2})\/([0O]?[A-Z]{2,8})\/(\d{4})/g // 04/OCT/2025 o 04/0CT/2025
+      ];
+
+      for (const pattern of fechaPatterns) {
+        let match;
+        while ((match = pattern.exec(norm)) !== null) {
+          let dia, mes, año, mesTexto, fechaFormateada = "";
+
+          // Caso con nombres de mes en texto (“4 de octubre de 2025”)
+          if (pattern.source.includes("de") || pattern.source.includes("enero")) {
+            dia = match[1].padStart(2, "0");
+            mesTexto = match[2].toLowerCase();
+            mes = meses[mesTexto] || "00";
+            año = match[3];
+            fechaFormateada = `${dia}/${mes}/${año}`;
+          }
+
+          // Caso formato yyyy/mm/dd
+          else if (match[1].length === 4) {
+            año = match[1];
+            mes = match[2].padStart(2, "0");
+            dia = match[3].padStart(2, "0");
+            fechaFormateada = `${dia}/${mes}/${año}`;
+          }
+
+          // Caso dd/mm/yyyy numérico
+          else if (/^\d+$/.test(match[2])) {
+            dia = match[1].padStart(2, "0");
+            mes = match[2].padStart(2, "0");
+            año = match[3];
+            fechaFormateada = `${dia}/${mes}/${año}`;
+          }
+
+          // Caso abreviado con letras o errores OCR (“04/0CT/2025”)
+          else {
+            dia = match[1].padStart(2, "0");
+            const abreviado = match[2].toUpperCase().replace("0", "O"); // corrige 0→O
+            mes = meses[abreviado] || "00";
+            año = match[3];
+            fechaFormateada = `${dia}/${mes}/${año}`;
+          }
+
+          if (fechaFormateada !== "00/00/0000") fechaMatches.push(fechaFormateada);
+        }
+      }
+
+      if (fechaMatches.length > 0) {
+        campos.fecha.push(fechaMatches[0]); // primera coincidencia
+      }
+      
+    // 🔹 Código o número de transacción
       const codigoMatch = norm.match(/(Código\s+de\s+transacci[oó]n|Identificaci[oó]n\s+de\s+operaci[oó]n)[^\n:]*[:\s]+([A-Za-z0-9\-]+)/i);
       if (codigoMatch) campos.numero_operacion.push(codigoMatch[2]);
 
