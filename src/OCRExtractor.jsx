@@ -35,18 +35,15 @@ export default function OCRExtractor() {
   const [historial, setHistorial] = useState(
     JSON.parse(localStorage.getItem("historial")) || []
   );
-  const [comprobanteCargado, setComprobanteCargado] = useState(false);
+   const [comprobanteCargado, setComprobanteCargado] = useState(false);
   const [tipoEntidad, setTipoEntidad] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
-
   const canvasRef = useRef(null);
 
-  // Abrir menú de entidad
-  const handleTipoClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+   // Abrir menú de entidad
+  const handleTipoClick = (event) => setAnchorEl(event.currentTarget);
 
-  // Selección de entidad
+  // Seleccionar tipo de comprobante
   const handleTipoSelect = (tipo) => {
     setTipoEntidad(tipo);
     setAnchorEl(null);
@@ -123,7 +120,49 @@ export default function OCRExtractor() {
   // 🔍 EXTRACT FIELDS LIMPIO Y CORREGIDO
   function extractFields(t) {
     if (!t) t = "";
-    const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
+     const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
+
+    //CASO NARANJAX
+     if (tipoEntidad === "NaranjaX") {
+      const campos = {
+        monto: [],
+        fecha: [],
+        numero_operacion: [],
+        nombre: [],
+        cuit: [],
+        cvu_cbu: [],
+      };
+      // 🔹 Normalizamos texto
+      const norm = t.replace(/\u00A0/g, " ").replace(/\r/g, "\n");
+
+      // 🔹 Monto (línea con símbolo $)
+      const montoMatch = norm.match(/\$\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,]\d{2})?)/);
+    
+      if (montoMatch) campos.monto.push(montoMatch[1].replace(/[.,]/g, (m) => (m === "," ? "." : "")));
+
+      // 🔹 Fecha (formato dd/mmm/yyyy o dd/MMM/yyyy)
+      const fechaMatch = norm.match(/\b(\d{2}\/[A-Z]{3,9}\/\d{4}|\d{2}\/\d{2}\/\d{4})/i);
+      if (fechaMatch) campos.fecha.push(fechaMatch[1]);
+
+      // 🔹 Código o número de transacción
+      const codigoMatch = norm.match(/(Código\s+de\s+transacci[oó]n|Identificaci[oó]n\s+de\s+operaci[oó]n)[^\n:]*[:\s]+([A-Za-z0-9\-]+)/i);
+      if (codigoMatch) campos.numero_operacion.push(codigoMatch[2]);
+
+      // 🔹 CUIT/CUIL (si querés mantenerlo)
+      const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
+      let m;
+      while ((m = cuitRegex.exec(norm)) !== null) {
+        campos.cuit.push(m[1].replace(/[\s-]/g, ""));
+      }
+     // 🔹 Nombre del titular (Naranja X) — versión robusta y sin shadowing de `norm`
+      const nombreMatch = norm.match(/NX\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)(?=\s+(?:Naranja|CBU|CUIL|\d|$))/i);
+      if (nombreMatch) campos.nombre.push(nombreMatch[1].trim());
+    
+      return campos;
+    }
+    //FINAL CASO NARANJAX
+
+   
 
     // CUIT/CUIL
     const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
