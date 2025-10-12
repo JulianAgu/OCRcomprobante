@@ -48,14 +48,26 @@ export default function Historial() {
         "CUIT/CUIL": r.cuit?.[0] || "No encontrado",
         "CVU/CBU": r.cvu_cbu?.[0] || "No encontrado",
         "Número de operación": r.numero_operacion?.[0] || "No encontrado",
-        "Monto": r.monto?.[0]
-          ? `$${r.monto[0]}`
-          : "No encontrado",
+        "Monto": r.monto?.[0] ? `$${r.monto[0]}` : "No encontrado",
         "Fecha": r.fecha?.[0] || "No encontrada",
       };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataParaExcel);
+
+    // 🪄 Ajuste automático de ancho de columnas
+    const columnas = Object.keys(dataParaExcel[0]);
+    const anchoColumnas = columnas.map((col) => {
+      const maxLength = Math.max(
+        col.length,
+        ...dataParaExcel.map((row) =>
+          row[col] ? row[col].toString().length : 0
+        )
+      );
+      return { wch: maxLength + 2 }; // +2 para margen visual
+    });
+    worksheet["!cols"] = anchoColumnas;
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados Extraídos");
     XLSX.writeFile(workbook, "ResultadosExtraidos.xlsx");
