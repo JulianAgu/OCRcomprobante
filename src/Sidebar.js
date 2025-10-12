@@ -7,17 +7,20 @@ import {
   ListItemText,
   ListItemIcon,
   Button,
+  Typography,
 } from "@mui/material";
-import {
-  Home,
-  Description,
-  Person,
-  Logout,
-  History,
-} from "@mui/icons-material";
-import { Link } from "react-router-dom";
+import { Home, Description, Person, Logout, History } from "@mui/icons-material";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Sidebar({ onLogout }) {
+  const location = useLocation();
+
+  const navItems = [
+    { text: "Inicio", icon: <Home />, path: "/home" },
+    { text: "Comprobante", icon: <Description />, path: "/ocr" },
+    { text: "Historial", icon: <History />, path: "/historial" },
+  ];
+
   return (
     <Drawer
       variant="permanent"
@@ -26,45 +29,54 @@ export default function Sidebar({ onLogout }) {
         width: 240,
         flexShrink: 0,
         [`& .MuiDrawer-paper`]: { width: 240, boxSizing: "border-box" },
+        fontFamily: "'Poppins', sans-serif",
       }}
     >
       <List>
-        {/* Inicio */}
-        <ListItem button component={Link} to="/home">
-          <ListItemIcon>
-            <Home />
-          </ListItemIcon>
-          <ListItemText primary="Inicio" />
-        </ListItem>
+        {navItems.map((item) => (
+          <ListItem
+            key={item.text}
+            button
+            component={Link}
+            to={item.path}
+            sx={{
+              color: "black",
+              fontWeight: "bold",
+              "&:hover": { backgroundColor: "#f0f0f0" },
+              "&.Mui-selected": { backgroundColor: "#e0e0e0" },
+              textDecoration: "none",
+            }}
+            selected={location.pathname === item.path}
+          >
+            <ListItemIcon sx={{ color: "black" }}>{item.icon}</ListItemIcon>
+            <ListItemText
+              primary={
+                <Typography sx={{ fontWeight: "bold", color: "black" }}>
+                  {item.text}
+                </Typography>
+              }
+            />
+          </ListItem>
+        ))}
 
-        {/* Comprobante */}
-        <ListItem button component={Link} to="/ocr">
-          <ListItemIcon>
-            <Description />
-          </ListItemIcon>
-          <ListItemText primary="Comprobante" />
-        </ListItem>
-
-        {/* Perfil (en desarrollo) */}
+        {/* Perfil grisado */}
         <ListItem
-          disabled // 🚫 lo deshabilita visualmente y funcionalmente
+          disabled
           sx={{
-            opacity: 0.5, // 🔘 grisado
-            cursor: "not-allowed", // 🔘 cursor bloqueado
+            opacity: 0.5,
+            cursor: "not-allowed",
           }}
         >
           <ListItemIcon>
-            <Person color="disabled" /> {/* Ícono gris */}
+            <Person color="disabled" />
           </ListItemIcon>
-          <ListItemText primary="Perfil (en desarrollo)" />
-        </ListItem>
-
-        {/* Historial */}
-        <ListItem button component={Link} to="/historial">
-          <ListItemIcon>
-            <History />
-          </ListItemIcon>
-          <ListItemText primary="Historial" />
+          <ListItemText
+            primary={
+              <Typography sx={{ fontWeight: "normal", color: "gray" }}>
+                Perfil (en desarrollo)
+              </Typography>
+            }
+          />
         </ListItem>
       </List>
 
