@@ -11,11 +11,13 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   List,
   ListItem,
   ListItemText,
   Menu,
   MenuItem,
+  TextField,
 } from "@mui/material";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -38,6 +40,15 @@ export default function OCRExtractor() {
    const [comprobanteCargado, setComprobanteCargado] = useState(false);
   const [tipoEntidad, setTipoEntidad] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedResults, setEditedResults] = useState({
+    nombre: "",
+    cuit: "",
+    cvu_cbu: "",
+    numero_operacion: "",
+    monto: "",
+    fecha: "",
+  });
   const canvasRef = useRef(null);
 
    // Abrir menú de entidad
@@ -48,6 +59,46 @@ export default function OCRExtractor() {
     setTipoEntidad(tipo);
     setAnchorEl(null);
     document.getElementById("fileInput").click();
+  };
+
+  // Abrir diálogo de edición
+  const handleOpenEditDialog = () => {
+    setEditedResults({
+      nombre: results.nombre[0] || "",
+      cuit: results.cuit[0] || "",
+      cvu_cbu: results.cvu_cbu[0] || "",
+      numero_operacion: results.numero_operacion[0] || "",
+      monto: results.monto[0] || "",
+      fecha: results.fecha[0] || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Guardar cambios editados
+  const handleSaveEdits = () => {
+    const updatedResults = {
+      nombre: editedResults.nombre ? [editedResults.nombre] : [],
+      cuit: editedResults.cuit ? [editedResults.cuit] : [],
+      cvu_cbu: editedResults.cvu_cbu ? [editedResults.cvu_cbu] : [],
+      numero_operacion: editedResults.numero_operacion ? [editedResults.numero_operacion] : [],
+      monto: editedResults.monto ? [editedResults.monto] : [],
+      fecha: editedResults.fecha ? [editedResults.fecha] : [],
+    };
+    
+    setResults(updatedResults);
+    
+    // Actualizar el historial con los datos editados
+    if (historial.length > 0) {
+      const historialActualizado = [...historial];
+      historialActualizado[0] = {
+        ...historialActualizado[0],
+        resultados: updatedResults,
+      };
+      setHistorial(historialActualizado);
+      localStorage.setItem("historial", JSON.stringify(historialActualizado));
+    }
+    
+    setEditDialogOpen(false);
   };
 
   const handleFile = async (e) => {
@@ -510,7 +561,18 @@ export default function OCRExtractor() {
 
       {/* Resultados */}
       <Paper sx={{ mt: 3, p: 2 }}>
-        <Typography variant="h6">Resultados extraídos:</Typography>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+          <Typography variant="h6">Resultados extraídos:</Typography>
+          {comprobanteCargado && (
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={handleOpenEditDialog}
+            >
+              Editar resultados
+            </Button>
+          )}
+        </Box>
 
         {!comprobanteCargado ? (
           <Typography color="text.secondary">
@@ -649,6 +711,66 @@ export default function OCRExtractor() {
             </Typography>
           )}
         </DialogContent>
+      </Dialog>
+
+      {/* Modal de edición de resultados */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Editar resultados extraídos</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+            <TextField
+              label="Titular"
+              value={editedResults.nombre}
+              onChange={(e) => setEditedResults({ ...editedResults, nombre: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="CUIT/CUIL"
+              value={editedResults.cuit}
+              onChange={(e) => setEditedResults({ ...editedResults, cuit: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="CVU/CBU"
+              value={editedResults.cvu_cbu}
+              onChange={(e) => setEditedResults({ ...editedResults, cvu_cbu: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Número de operación"
+              value={editedResults.numero_operacion}
+              onChange={(e) => setEditedResults({ ...editedResults, numero_operacion: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Monto"
+              value={editedResults.monto}
+              onChange={(e) => setEditedResults({ ...editedResults, monto: e.target.value })}
+              fullWidth
+              helperText="Sin el símbolo $"
+            />
+            <TextField
+              label="Fecha"
+              value={editedResults.fecha}
+              onChange={(e) => setEditedResults({ ...editedResults, fecha: e.target.value })}
+              fullWidth
+              helperText="Formato: DD/MM/AAAA"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button onClick={handleSaveEdits} variant="contained">
+            Guardar cambios
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
