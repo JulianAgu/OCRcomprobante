@@ -364,8 +364,38 @@ export default function OCRExtractor() {
     }
     //FINAL CASO NARANJAX
 
+
+    //CASO SANTANDER
+    if(tipoEntidad === "Santander"){
+      const campos = {
+        monto: [],
+        fecha: [],
+        numero_operacion: [],
+        nombre: [],
+        cuit: [],
+        cvu_cbu: [],
+      };
+      // Monto
+      const montoRegex = /Importe Debitado\s*[:\s]*\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/i;
+      const montoMatch = norm.match(montoRegex);
+      if (montoMatch) campos.monto.push(montoMatch[1]);
+      
+      // Fecha
+      const fechaRegex = /Fecha\s*[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i;
+      const fechaMatch = norm.match(fechaRegex);
+      if (fechaMatch) campos.fecha.push(fechaMatch[1]);
+
+      // Número de operación
+      const numeroOpRegex = /N[uú]mero de Comprobante\s*[:\s]*(\d{6,20})/i;
+      const numeroOpMatch = norm.match(numeroOpRegex);
+      if (numeroOpMatch) campos.numero_operacion.push(numeroOpMatch[1]);
+
+      return campos;
+    
+    }//FINAL CASO SANTANDER
    
 
+    //CASO MERCADO PAGO Y GALICIA
     // CUIT/CUIL
     const cuitRegex = /\b((?:20|23|24|27|30|33|34)[-\s]?\d{7,8}[-\s]?\d)\b/gi;
     const cuitMatches = [];
@@ -517,7 +547,7 @@ export default function OCRExtractor() {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-          {["Mercado Pago", "Galicia", "NaranjaX"].map((tipo) => (
+          {["Mercado Pago", "Galicia", "NaranjaX","Santander"].map((tipo) => (
             <MenuItem key={tipo} onClick={() => handleTipoSelect(tipo)}>
               {tipo}
             </MenuItem>
