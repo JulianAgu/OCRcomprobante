@@ -375,6 +375,8 @@ export default function OCRExtractor() {
         cuit: [],
         cvu_cbu: [],
       };
+      //En este caso, el comprobante no tiene el nombre del titular ni CUIT/CUIL ni CVU/CBU, por lo que no se buscan.
+
       // Monto
       const montoRegex = /Importe Debitado\s*[:\s]*\$?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?)/i;
       const montoMatch = norm.match(montoRegex);
@@ -394,6 +396,55 @@ export default function OCRExtractor() {
     
     }//FINAL CASO SANTANDER
    
+    //CASO MACRO
+    if (tipoEntidad === "Macro") {
+      const campos = {
+        monto: [],
+        fecha: [],
+        numero_operacion: [],
+        nombre: [],
+        cuit: [],
+        cvu_cbu: [],
+      };
+      // Monto
+      const montoRegex = /Importe\s*[:\s]*\$?\s*([0-9]+(?:[.,][0-9]{1,2})?)/i;
+      const montoMatch = norm.match(montoRegex);
+
+      if (montoMatch) { 
+        let raw = montoMatch[1].trim();  // 2️⃣ Parseamos el número
+        const valor = parseFloat(raw);
+
+        if (!isNaN(valor)) {
+          // 3️⃣ Verificamos si el texto original tenía decimales
+          const tieneDecimales = /[.,]\d{1,2}$/.test(montoMatch[1]);
+
+          // 4️⃣ Formateamos según corresponda
+          const numeroFormateado = valor.toLocaleString("es-AR", {
+            minimumFractionDigits: tieneDecimales ? 2 : 0,
+            maximumFractionDigits: tieneDecimales ? 2 : 0,
+          });
+
+          campos.monto.push(`${numeroFormateado}`);
+        }
+      }
+
+
+      
+      // --- Fecha + Número de operación ---
+      // Captura casos como "04/10/2025 01:30 7111"
+      const fechaNumOpRegex = /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})[^\d]*(?:\d{1,2}:\d{2})?[^\d]*(\d{3,6})\b/;
+      const fechaNumOpMatch = norm.match(fechaNumOpRegex);
+      if (fechaNumOpMatch) {
+        campos.fecha.push(fechaNumOpMatch[1]);
+        campos.numero_operacion.push(fechaNumOpMatch[2]);
+      }
+
+      return campos;  
+
+
+    } // FINAL CASO MACRO
+
+
 
     //CASO MERCADO PAGO Y GALICIA
     // CUIT/CUIL
@@ -547,7 +598,7 @@ export default function OCRExtractor() {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-          {["Mercado Pago", "Galicia", "NaranjaX","Santander"].map((tipo) => (
+          {["Mercado Pago", "Galicia", "NaranjaX","Santander","Macro"].map((tipo) => (
             <MenuItem key={tipo} onClick={() => handleTipoSelect(tipo)}>
               {tipo}
             </MenuItem>
