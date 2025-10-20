@@ -42,6 +42,7 @@ export default function OCRExtractor() {
   const [anchorEl, setAnchorEl] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedResults, setEditedResults] = useState({
+    tipoEntidad: "",
     nombre: "",
     cuit: "",
     cvu_cbu: "",
@@ -64,6 +65,7 @@ export default function OCRExtractor() {
   // Abrir diálogo de edición
   const handleOpenEditDialog = () => {
     setEditedResults({
+      tipoEntidad: tipoEntidad || "",
       nombre: results.nombre[0] || "",
       cuit: results.cuit[0] || "",
       cvu_cbu: results.cvu_cbu[0] || "",
@@ -86,12 +88,14 @@ export default function OCRExtractor() {
     };
     
     setResults(updatedResults);
+    setTipoEntidad(editedResults.tipoEntidad); // Actualizar la entidad bancaria
     
     // Actualizar el historial con los datos editados
     if (historial.length > 0) {
       const historialActualizado = [...historial];
       historialActualizado[0] = {
         ...historialActualizado[0],
+        tipoEntidad: editedResults.tipoEntidad,
         resultados: updatedResults,
       };
       setHistorial(historialActualizado);
@@ -804,6 +808,19 @@ export default function OCRExtractor() {
         <DialogTitle>Editar resultados extraídos</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+            <TextField
+              select
+              label="Entidad Bancaria"
+              value={editedResults.tipoEntidad}
+              onChange={(e) => setEditedResults({ ...editedResults, tipoEntidad: e.target.value })}
+              fullWidth
+            >
+              <MenuItem value="Mercado Pago">Mercado Pago</MenuItem>
+              <MenuItem value="Galicia">Galicia</MenuItem>
+              <MenuItem value="NaranjaX">NaranjaX</MenuItem>
+              <MenuItem value="Santander">Santander</MenuItem>
+              <MenuItem value="Macro">Macro</MenuItem>
+            </TextField>
             <TextField
               label="Titular"
               value={editedResults.nombre}
